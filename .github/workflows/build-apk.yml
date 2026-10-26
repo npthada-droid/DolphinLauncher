@@ -21,17 +21,23 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Find project folder
+        run: |
+          P=$(dirname "$(find . -name settings.gradle.kts -not -path '*/build/*' | head -1)")
+          echo "Project at: $P"
+          echo "PROJ=$P" >> $GITHUB_ENV
+
       - name: Build debug + release APK
         run: |
+          cd "$PROJ"
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug assembleRelease
 
       - name: Collect APK files
         run: |
           mkdir -p out
-          find app/build/outputs/apk -name "*.apk" -print
-          cp app/build/outputs/apk/release/*.apk out/DolphinLauncher.apk 2>/dev/null || true
-          cp app/build/outputs/apk/debug/*.apk out/DolphinLauncher-debug.apk 2>/dev/null || true
+          cp "$PROJ"/app/build/outputs/apk/release/*.apk out/DolphinLauncher.apk 2>/dev/null || true
+          cp "$PROJ"/app/build/outputs/apk/debug/*.apk out/DolphinLauncher-debug.apk 2>/dev/null || true
           ls -la out
           test -n "$(ls out)"
 
@@ -40,7 +46,6 @@ jobs:
           name: DolphinLauncher-apk
           path: out/*.apk
 
-      # ลิงก์ดาวน์โหลดตรงสำหรับมือถือ: หน้า Releases > "latest"
       - name: Publish to Releases (latest)
         uses: softprops/action-gh-release@v2
         with:

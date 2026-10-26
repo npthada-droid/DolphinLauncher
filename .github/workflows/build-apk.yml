@@ -27,6 +27,14 @@ jobs:
           echo "Project at: $P"
           echo "PROJ=$P" >> $GITHUB_ENV
 
+      - name: Patch known compile errors
+        run: |
+          find "$PROJ/app/src" -name "*.kt" -exec sed -i \
+            -e 's/rounded\.ThreeSixty/rounded.Panorama/g' \
+            -e 's/Rounded\.ThreeSixty/Rounded.Panorama/g' \
+            -e 's/INVERTED_COLORS/INVERT_COLORS/g' \
+            -e 's/java\.util\.th\.dolphin/th.dolphin/g' {} +
+
       - name: Build debug + release APK
         run: |
           cd "$PROJ"

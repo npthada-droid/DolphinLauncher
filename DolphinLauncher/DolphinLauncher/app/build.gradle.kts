@@ -1,69 +1,64 @@
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
-}
+name: Build APK
 
-android {
-    namespace = "th.dolphin.launcher"
-    compileSdk = 35
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: {}
 
-    defaultConfig {
-        applicationId = "th.dolphin.launcher"
-        minSdk = 26
-        // targetSdk 29 = Android 10 (DiLink) : ลดข้อจำกัด background/overlay/hidden-API บนหัวเครื่องรถ
-        targetSdk = 29
-        versionCode = 7
-        versionName = "1.6.0"
-    }
+permissions:
+  contents: write
 
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            // เซ็นด้วย debug key เพื่อให้ติดตั้งได้ทันที (เปลี่ยนเป็น keystore ของคุณเองได้)
-            signingConfig = signingConfigs.getByName("debug")
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
-    lint {
-        abortOnError = false
-        checkReleaseBuilds = false
-        disable += setOf("ExpiredTargetSdkVersion", "OldTargetApi")
-    }
-}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
-    implementation(composeBom)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+      - uses: gradle/actions/setup-gradle@v4
 
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+      - name: Find project folder
+        run: |
+          P=$(dirname "$(find . -name settings.gradle.kts -not -path '*/build/*' | head -1)")
+          echo "Project at: $P"
+          echo "PROJ=$P" >> $GITHUB_ENV
 
-    // แผนที่ OpenStreetMap (ไม่ต้องใช้ API key)
-    implementation("org.osmdroid:osmdroid-android:6.1.18")
+      - name: Patch known compile errors
+        run: |
+          find "$PROJ/app/src" -name "*.kt" -exec sed -i \
+            -e 's/rounded\.ThreeSixty/rounded.Panorama/g' \
+            -e 's/Rounded\.ThreeSixty/Rounded.Panorama/g' \
+            -e 's/INVERTED_COLORS/INVERT_COLORS/g' \
+            -e 's/java\.util\.th\.dolphin/th.dolphin/g' {} +
 
-    val camerax = "1.4.1"
-    implementation("androidx.camera:camera-core:$camerax")
-    implementation("androidx.camera:camera-camera2:$camerax")
-    implementation("androidx.camera:camera-lifecycle:$camerax")
-    implementation("androidx.camera:camera-view:$camerax")
-}
+      - name: Build debug + release APK
+        run: |
+          cd "$PROJ"
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug assembleRelease
+
+      - name: Collect APK files
+        run: |
+          mkdir -p out
+          cp "$PROJ"/app/build/outputs/apk/release/*.apk out/DolphinLauncher.apk 2>/dev/null || true
+          cp "$PROJ"/app/build/outputs/apk/debug/*.apk out/DolphinLauncher-debug.apk 2>/dev/null || true
+          ls -la out
+          test -n "$(ls out)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DolphinLauncher-apk
+          path: out/*.apk
+
+      - name: Publish to Releases (latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Dolphin Launcher (build ล่าสุด)
+          prerelease: true
+          make_latest: true
+          files: out/*.apk

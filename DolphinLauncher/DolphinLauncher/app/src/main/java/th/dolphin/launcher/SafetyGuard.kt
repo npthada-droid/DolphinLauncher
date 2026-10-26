@@ -45,7 +45,7 @@ object SafetyGuard {
      * นับเหตุการณ์ — ถ้าเกิน [limit] ครั้งภายใน [windowMs] จะตัดการทำงานทันที
      * @return false = ห้ามทำต่อ
      */
-    @Synchronized
+
     /** จำกัดความถี่แบบนุ่มนวล: เกินแล้วแค่ข้าม ไม่หยุด Launcher (ใช้กับเหตุการณ์ปกติจากการขับ เช่น ไฟเลี้ยว) */
     @Synchronized
     fun allowSoft(key: String, limit: Int, windowMs: Long): Boolean {

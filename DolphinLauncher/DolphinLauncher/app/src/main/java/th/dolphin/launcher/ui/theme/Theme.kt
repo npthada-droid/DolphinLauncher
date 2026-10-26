@@ -28,6 +28,8 @@ data class UiPrefs(
     val accent: Color = Color(0xFF2EC4B6),
     val accent2: Color = Color(0xFF3B82F6),
     val showGrid: Boolean = true,
+    val textGlow: Boolean = true,
+    val glassShine: Boolean = true,
 )
 
 val LocalUi = staticCompositionLocalOf { UiPrefs() }
@@ -118,8 +120,8 @@ fun LauncherTheme(cfg: AppSettings, content: @Composable () -> Unit) {
             surface = Color(0xFF141C28),
             onSurface = Color(0xFFEAF0F7),
             surfaceVariant = Color(0xFF1A212D),
-            onSurfaceVariant = Color(0xFF8693A6),
-            outline = Color(0x17FFFFFF),
+            onSurfaceVariant = Color(0xFFAEBACB),
+            outline = Color(0x26FFFFFF),
             outlineVariant = Color(0x14FFFFFF),
             error = StatusColors.bad,
         )
@@ -135,7 +137,7 @@ fun LauncherTheme(cfg: AppSettings, content: @Composable () -> Unit) {
             surface = Color(0xFFFFFFFF),
             onSurface = Color(0xFF0D141C),
             surfaceVariant = Color(0xFFE4E9EF),
-            onSurfaceVariant = Color(0xFF5A6676),
+            onSurfaceVariant = Color(0xFF4A5566),
             outline = Color(0x140A1428),
             outlineVariant = Color(0x10000000),
             error = Color(0xFFDC2626),
@@ -143,8 +145,8 @@ fun LauncherTheme(cfg: AppSettings, content: @Composable () -> Unit) {
     }
     CompositionLocalProvider(
         th.dolphin.launcher.i18n.LocalLang provides th.dolphin.launcher.i18n.I18n.resolve(cfg.language),
-        LocalUi provides UiPrefs(cfg.cornerRadius.dp, cfg.cardOpacity, dark, accent, Color(cfg.accent2), cfg.showGrid),
+        LocalUi provides UiPrefs(cfg.cornerRadius.dp, cfg.cardOpacity, dark, accent, Color(cfg.accent2), cfg.showGrid, cfg.textGlow, cfg.glassShine),
     ) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        MaterialTheme(colorScheme = scheme) { CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides scheme.onSurface, content = content) }
     }
 }

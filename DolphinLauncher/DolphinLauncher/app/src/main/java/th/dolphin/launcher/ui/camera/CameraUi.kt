@@ -34,7 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ThreeSixty
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -169,7 +169,7 @@ fun CameraScreen(cfg: AppSettings, onBack: (() -> Unit)?) {
             Button(onClick = {
                 if (!app.apps.launchTarget(cfg.panoramaPkg)) ctx.toast("ตั้งค่าแอป 360° ได้ที่ ตั้งค่า > กล้อง & ไฟเลี้ยว")
             }) {
-                Icon(Icons.Rounded.ThreeSixty, null)
+                Icon(Icons.Rounded.Videocam, null)
                 Spacer(Modifier.width(8.dp))
                 Text("เปิด 360° ของรถ")
             }

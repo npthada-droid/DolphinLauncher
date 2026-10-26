@@ -18,7 +18,9 @@ data class AppSettings(
     val accent: Long = 0xFF2EC4B6,
     val accent2: Long = 0xFF3B82F6,
     val showGrid: Boolean = true,
-    val cardOpacity: Float = 0.55f,
+    val cardOpacity: Float = 0.38f,
+    val textGlow: Boolean = true,           // เงาตัวหนังสือ อ่านง่ายบนการ์ดโปร่งใส
+    val glassShine: Boolean = true,         // ไล่แสงแบบกระจกบนการ์ด
     val cornerRadius: Int = 26,
     val layoutMode: String = "auto",         // auto | landscape | portrait
     val use24h: Boolean = true,
@@ -78,6 +80,10 @@ data class AppSettings(
         "action:apps", "action:phone", "action:radio", "action:camera", "action:projection", "action:battery", "action:settings"
     ),
     val accelTarget: Int = 100,
+    // ---- จัดวางหน้าหลัก ----
+    val homeLeft: List<String> = listOf("energy", "safety"),
+    val homeRight: List<String> = listOf("tires", "media", "phone"),
+    val centerPos: String = "center",       // left | center | right
     // ---- ทริป / ชาร์จ / บำรุงรักษา ----
     val batteryKwh: Float = 60.48f,          // ความจุแบต (Dolphin Extended 60.48 / Standard 44.9)
     val elecPrice: Float = 4.5f,             // บาท/kWh
@@ -110,7 +116,7 @@ data class AppSettings(
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("language", language); put("themeMode", themeMode); put("autoLightFrom", autoLightFrom); put("autoDarkFrom", autoDarkFrom)
-        put("accent", accent); put("accent2", accent2); put("showGrid", showGrid); put("cardOpacity", cardOpacity.toDouble()); put("cornerRadius", cornerRadius)
+        put("accent", accent); put("accent2", accent2); put("showGrid", showGrid); put("cardOpacity", cardOpacity.toDouble()); put("textGlow", textGlow); put("glassShine", glassShine); put("cornerRadius", cornerRadius)
         put("layoutMode", layoutMode); put("use24h", use24h); put("showSeconds", showSeconds); put("immersive", immersive)
         put("wallpaperPath", wallpaperPath); put("wallpaperDim", wallpaperDim.toDouble())
         put("carName", carName); put("plate", plate); put("carImagePath", carImagePath); put("rightHandDrive", rightHandDrive)
@@ -126,7 +132,7 @@ data class AppSettings(
         put("bubbleEnabled", bubbleEnabled); put("bubbleX", bubbleX); put("bubbleY", bubbleY)
         put("cameraNames", cameraNames)
         put("dataSource", dataSource); put("pollMs", pollMs); put("bydMap", bydMap)
-        put("dock", JSONArray(dock)); put("accelTarget", accelTarget)
+        put("dock", JSONArray(dock)); put("homeLeft", JSONArray(homeLeft)); put("homeRight", JSONArray(homeRight)); put("centerPos", centerPos); put("accelTarget", accelTarget)
         put("batteryKwh", batteryKwh.toDouble()); put("elecPrice", elecPrice.toDouble()); put("overspeedKmh", overspeedKmh)
         put("serviceEveryKm", serviceEveryKm); put("serviceEveryMonths", serviceEveryMonths)
         put("lastServiceOdo", lastServiceOdo.toDouble()); put("lastServiceDate", lastServiceDate)
@@ -146,11 +152,13 @@ data class AppSettings(
             fun i(k: String, def: Int) = o.optInt(k, def)
             fun f(k: String, def: Float) = o.optDouble(k, def.toDouble()).toFloat()
             val dock = o.optJSONArray("dock")?.let { a -> List(a.length()) { a.getString(it) } } ?: d.dock
+            val homeLeft = o.optJSONArray("homeLeft")?.let { a -> List(a.length()) { a.getString(it) } } ?: d.homeLeft
+            val homeRight = o.optJSONArray("homeRight")?.let { a -> List(a.length()) { a.getString(it) } } ?: d.homeRight
             return AppSettings(
                 language = s("language", d.language), themeMode = s("themeMode", d.themeMode), autoLightFrom = i("autoLightFrom", d.autoLightFrom),
                 autoDarkFrom = i("autoDarkFrom", d.autoDarkFrom), accent = o.optLong("accent", d.accent), accent2 = o.optLong("accent2", d.accent2),
                 showGrid = b("showGrid", d.showGrid),
-                cardOpacity = f("cardOpacity", d.cardOpacity), cornerRadius = i("cornerRadius", d.cornerRadius),
+                cardOpacity = f("cardOpacity", d.cardOpacity), textGlow = b("textGlow", d.textGlow), glassShine = b("glassShine", d.glassShine), cornerRadius = i("cornerRadius", d.cornerRadius),
                 layoutMode = s("layoutMode", d.layoutMode), use24h = b("use24h", d.use24h),
                 showSeconds = b("showSeconds", d.showSeconds), immersive = b("immersive", d.immersive),
                 wallpaperPath = s("wallpaperPath", d.wallpaperPath), wallpaperDim = f("wallpaperDim", d.wallpaperDim),
@@ -172,7 +180,7 @@ data class AppSettings(
                 phonePkg = s("phonePkg", d.phonePkg), favorites = s("favorites", d.favorites), bubbleEnabled = b("bubbleEnabled", d.bubbleEnabled),
                 bubbleX = i("bubbleX", d.bubbleX), bubbleY = i("bubbleY", d.bubbleY),
                 cameraNames = s("cameraNames", d.cameraNames), dataSource = s("dataSource", d.dataSource),
-                pollMs = i("pollMs", d.pollMs), bydMap = s("bydMap", d.bydMap), dock = dock,
+                pollMs = i("pollMs", d.pollMs), bydMap = s("bydMap", d.bydMap), dock = dock, homeLeft = homeLeft, homeRight = homeRight, centerPos = s("centerPos", d.centerPos),
                 accelTarget = i("accelTarget", d.accelTarget),
                 batteryKwh = f("batteryKwh", d.batteryKwh), elecPrice = f("elecPrice", d.elecPrice),
                 overspeedKmh = i("overspeedKmh", d.overspeedKmh), serviceEveryKm = i("serviceEveryKm", d.serviceEveryKm),

@@ -50,7 +50,7 @@ fun OsmMap(fix: GeoFix?, zoom: Double, darkTiles: Boolean, modifier: Modifier) {
         }
     }
     LaunchedEffect(darkTiles) {
-        map.overlayManager.tilesOverlay.setColorFilter(if (darkTiles) TilesOverlay.INVERTED_COLORS else null)
+        map.overlayManager.tilesOverlay.setColorFilter(if (darkTiles) TilesOverlay.INVERT_COLORS else null)
         map.invalidate()
     }
     LaunchedEffect(zoom) { map.controller.setZoom(zoom) }

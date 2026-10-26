@@ -66,12 +66,20 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <!-- ใช้เป็นหน้าหลัก (HOME) ได้เฉพาะเมื่อปลดล็อกด้วยรหัสผ่านในตั้งค่า — ปิดไว้ตั้งแต่ติดตั้ง -->
+        <activity-alias
+            android:name=".HomeAlias"
+            android:targetActivity=".ui.MainActivity"
+            android:enabled="false"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-        </activity>
+        </activity-alias>
 
         <activity
             android:name=".ui.camera.TurnCameraActivity"

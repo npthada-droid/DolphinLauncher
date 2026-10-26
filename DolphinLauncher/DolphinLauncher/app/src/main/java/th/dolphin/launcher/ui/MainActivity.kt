@@ -36,7 +36,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.ThreeSixty
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import th.dolphin.launcher.i18n.Text
@@ -107,6 +107,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // ยังไม่ปลดล็อกการใช้เป็นหน้าหลัก → ส่งปุ่ม Home ไปหน้าจอเดิมของรถ
+        if (intent?.hasCategory(Intent.CATEGORY_HOME) == true && !th.dolphin.launcher.HomeLock.isUnlocked(this) &&
+            CrashGuard.openFallbackHome(this)
+        ) {
+            finish()
+            return
+        }
         // แอปเด้งซ้ำ → ปุ่ม Home พาไป Launcher เดิมของรถทันที (ไม่เสี่ยงเด้งซ้ำอีก)
         if (CrashGuard.inSafeMode(this) && intent?.hasCategory(Intent.CATEGORY_HOME) == true && CrashGuard.openFallbackHome(this)) {
             toast("Dolphin Launcher หยุดทำงานเพื่อความปลอดภัย · เปิดแอปจากไอคอนเพื่อดูสาเหตุ")
@@ -318,7 +325,7 @@ private fun NavRail(current: Screen, onSelect: (Screen) -> Unit, onTheme: () -> 
         RailItem(Icons.Rounded.Home, "หน้าหลัก", current == Screen.HOME) { onSelect(Screen.HOME) }
         RailItem(Icons.Rounded.Apps, "แอป", current == Screen.APPS) { onSelect(Screen.APPS) }
         RailItem(Icons.Rounded.LibraryMusic, "เสียง", current == Screen.AUDIO) { onSelect(Screen.AUDIO) }
-        RailItem(Icons.Rounded.ThreeSixty, "กล้อง 360", current == Screen.CAMERA) { onSelect(Screen.CAMERA) }
+        RailItem(Icons.Rounded.Videocam, "กล้อง 360", current == Screen.CAMERA) { onSelect(Screen.CAMERA) }
         RailItem(Icons.Rounded.Settings, "ตั้งค่า", current == Screen.SETTINGS) { onSelect(Screen.SETTINGS) }
         Spacer(Modifier.weight(1f))
         RailItem(if (ui.dark) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, "ธีม", false, onTheme)

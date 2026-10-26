@@ -64,6 +64,13 @@ fun GlassCard(
         modifier
             .clip(shape)
             .background(c.surface.copy(alpha = ui.opacity))
+            .then(
+                if (ui.glassShine) Modifier.background(
+                    Brush.verticalGradient(
+                        listOf(Color.White.copy(alpha = if (ui.dark) 0.07f else 0.35f), Color.Transparent, Color.Black.copy(alpha = if (ui.dark) 0.10f else 0f))
+                    )
+                ) else Modifier
+            )
             .border(1.dp, edge, shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(padding),

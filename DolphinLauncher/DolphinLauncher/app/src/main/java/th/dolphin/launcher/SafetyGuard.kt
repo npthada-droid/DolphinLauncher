@@ -46,6 +46,19 @@ object SafetyGuard {
      * @return false = ห้ามทำต่อ
      */
     @Synchronized
+    /** จำกัดความถี่แบบนุ่มนวล: เกินแล้วแค่ข้าม ไม่หยุด Launcher (ใช้กับเหตุการณ์ปกติจากการขับ เช่น ไฟเลี้ยว) */
+    @Synchronized
+    fun allowSoft(key: String, limit: Int, windowMs: Long): Boolean {
+        if (_tripped.value != null) return false
+        val now = SystemClock.elapsedRealtime()
+        val q = counters.getOrPut("soft:$key") { ArrayDeque() }
+        while (q.isNotEmpty() && now - q.first() > windowMs) q.removeFirst()
+        if (q.size >= limit) return false
+        q.addLast(now)
+        return true
+    }
+
+    @Synchronized
     fun allow(key: String, limit: Int, windowMs: Long, label: String): Boolean {
         if (_tripped.value != null) return false
         val lim = if (strict) (limit * 2 / 3).coerceAtLeast(2) else limit
@@ -70,6 +83,7 @@ object SafetyGuard {
 
     fun reset(ctx: Context) {
         synchronized(this) { counters.clear() }
+        HangWatchdog.grace()
         _tripped.value = null
         ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().remove("trip").apply()
     }
@@ -112,6 +126,13 @@ object HangWatchdog {
     @Volatile private var lastPong = SystemClock.uptimeMillis()
     @Volatile var timeoutSec: Int = 6
     private var thread: Thread? = null
+    // ช่วงเริ่มทำงาน (เปิดเครื่อง/โหลดแผนที่ครั้งแรก) อาจช้า — ยังไม่ตรวจ 30 วินาทีแรก
+    @Volatile private var graceUntil = SystemClock.uptimeMillis() + 30_000L
+
+    fun grace(ms: Long = 30_000L) {
+        graceUntil = SystemClock.uptimeMillis() + ms
+        lastPong = SystemClock.uptimeMillis()
+    }
 
     fun start(ctx: Context) {
         if (thread != null) return
@@ -122,7 +143,7 @@ object HangWatchdog {
                 main.post { lastPong = SystemClock.uptimeMillis() }
                 try { Thread.sleep(1000) } catch (e: InterruptedException) { return@Thread }
                 val limit = timeoutSec
-                if (limit <= 0 || SafetyGuard.isTripped) { lastPong = SystemClock.uptimeMillis(); continue }
+                if (limit <= 0 || SafetyGuard.isTripped || SystemClock.uptimeMillis() < graceUntil) { lastPong = SystemClock.uptimeMillis(); continue }
                 // uptimeMillis ไม่นับช่วงเครื่องหลับ จึงไม่แจ้งเตือนผิดหลังรถดับ/ติดเครื่อง
                 val late = SystemClock.uptimeMillis() - lastPong
                 if (late > limit * 1000L) {

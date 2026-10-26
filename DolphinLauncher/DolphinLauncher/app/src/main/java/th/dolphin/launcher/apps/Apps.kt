@@ -245,6 +245,22 @@ class ShortcutStore(context: Context) {
 
     fun addPage() = set(_pages.value + listOf(emptyList<String>()))
 
+    /** ย้ายทางลัดซ้าย(-1)/ขวา(+1) — ถ้าสุดขอบหน้าจะย้ายไปหน้าถัดไป/ก่อนหน้า */
+    fun move(page: Int, key: String, delta: Int) {
+        val v = _pages.value.map { it.toMutableList() }.toMutableList()
+        val p = v.getOrNull(page) ?: return
+        val i = p.indexOf(key)
+        if (i < 0) return
+        val j = i + delta
+        when {
+            j in p.indices -> { p[i] = p[j]; p[j] = key }
+            j < 0 && page > 0 -> { p.removeAt(i); v[page - 1].add(key) }
+            j >= p.size && page < v.size - 1 -> { p.removeAt(i); v[page + 1].add(0, key) }
+            else -> return
+        }
+        set(v)
+    }
+
     fun removePage(page: Int) {
         if (_pages.value.size <= 1) return
         set(_pages.value.filterIndexed { i, _ -> i != page })

@@ -3,6 +3,7 @@
 package th.dolphin.launcher.ui.home
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -64,6 +65,16 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Thermostat
+import androidx.compose.material.icons.rounded.Fullscreen
+import androidx.compose.material.icons.rounded.Dashboard
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.runtime.key
+import androidx.compose.material.icons.rounded.FullscreenExit
+import androidx.compose.material.icons.rounded.DeviceThermostat
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import th.dolphin.launcher.i18n.Text
@@ -145,14 +156,21 @@ fun HomeScreen(cfg: AppSettings, st: VehicleState, onAction: (String) -> Unit) {
             "portrait" -> false
             else -> maxWidth > maxHeight
         }
+        val ctl = remember { CenterCtl(cfg.carShowSec) }
+        if (ctl.full) {
+            BackHandler { ctl.full = false }
+            CenterStage(cfg, st, Modifier.fillMaxSize(), onAction, ctl, full = true)
+            return@BoxWithConstraints
+        }
         Column(Modifier.fillMaxSize()) {
-            TopBar(cfg, st, onAction)
+            if (ctl.arrange) ArrangeBar(cfg) { ctl.arrange = false }
+            else TopBar(cfg, st, onAction) { ctl.arrange = true }
             Spacer(Modifier.height(12.dp))
             if (cfg.widgetsPage) {
                 // ปัดซ้ายเพื่อไปหน้าวิดเจ็ต
                 val pager = rememberPagerState { 2 }
                 HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), beyondViewportPageCount = 1) { page ->
-                    if (page == 0) Column(Modifier.fillMaxSize()) { Dashboard(cfg, st, onAction, landscape) }
+                    if (page == 0) Column(Modifier.fillMaxSize()) { Dashboard(cfg, st, onAction, landscape, ctl) }
                     else th.dolphin.launcher.ui.widgets.WidgetsBoard(Modifier.fillMaxSize())
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.Center) {
@@ -167,29 +185,61 @@ fun HomeScreen(cfg: AppSettings, st: VehicleState, onAction: (String) -> Unit) {
                     }
                 }
             } else {
-                Column(Modifier.weight(1f).fillMaxWidth()) { Dashboard(cfg, st, onAction, landscape) }
+                Column(Modifier.weight(1f).fillMaxWidth()) { Dashboard(cfg, st, onAction, landscape, ctl) }
             }
 
         }
     }
 }
 
-/** แดชบอร์ดหลัก (ต้องเรียกภายใน Column ที่มีความสูงจำกัด) */
+/** แดชบอร์ดหลัก (ต้องเรียกภายใน Column ที่มีความสูงจำกัด) — ตำแหน่งการ์ดมาจากตั้งค่า (homeLeft / homeRight / centerPos) */
 @Composable
 private fun androidx.compose.foundation.layout.ColumnScope.Dashboard(
-    cfg: AppSettings, st: VehicleState, onAction: (String) -> Unit, landscape: Boolean,
+    cfg: AppSettings, st: VehicleState, onAction: (String) -> Unit, landscape: Boolean, ctl: CenterCtl,
 ) {
-    if (landscape) {
-        Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Column(Modifier.weight(0.25f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                EnergyCard(cfg, st, Modifier.weight(1f).fillMaxWidth()) { onAction("action:battery") }
-                SafetyCard(st, Modifier.fillMaxWidth())
+    val app = LocalContext.current.app
+    val arrange = ctl.arrange
+    val left = cfg.homeLeft.filter { it in HOME_CARDS }
+    val right = cfg.homeRight.filter { it in HOME_CARDS && it !in left }
+    fun move(id: String, dir: String) = app.settings.update { s -> moveHomeCard(s, id, dir) }
+
+    @Composable
+    fun Card(id: String, modifier: Modifier) {
+        Arrangeable(arrange, modifier, onMove = { dir -> move(id, dir) }, onHide = { move(id, "hide") }) {
+            val m = if (isBigCard(id)) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
+            when (id) {
+                "energy" -> EnergyCard(cfg, st, m) { onAction("action:battery") }
+                "safety" -> SafetyCard(st, m)
+                "tires" -> TireCard(cfg, st, m) { onAction("action:tires") }
+                "media" -> MediaCard(m, onAction)
+                "phone" -> PhoneCard(cfg, m, onAction)
             }
-            CenterStage(cfg, st, Modifier.weight(0.5f).fillMaxHeight(), onAction)
+        }
+    }
+
+    if (landscape) {
+        @Composable
+        fun androidx.compose.foundation.layout.RowScope.Side(ids: List<String>) {
             Column(Modifier.weight(0.25f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                TireCard(cfg, st, Modifier.weight(1f).fillMaxWidth()) { onAction("action:tires") }
-                MediaCard(Modifier.fillMaxWidth(), onAction)
-                PhoneCard(cfg, Modifier.fillMaxWidth(), onAction)
+                ids.forEach { id ->
+                    key(id) { Card(id, if (isBigCard(id)) Modifier.weight(1f).fillMaxWidth() else Modifier.fillMaxWidth()) }
+                }
+                if (ids.none { isBigCard(it) }) Spacer(Modifier.weight(1f))
+            }
+        }
+        @Composable
+        fun androidx.compose.foundation.layout.RowScope.Center() {
+            Arrangeable(
+                arrange, Modifier.weight(0.5f).fillMaxHeight(),
+                onMove = { dir -> app.settings.update { s -> s.copy(centerPos = shiftCenter(s.centerPos, dir)) } },
+                onHide = null, vertical = false,
+            ) { CenterStage(cfg, st, Modifier.fillMaxSize(), onAction, ctl) }
+        }
+        Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            when (cfg.centerPos) {
+                "left" -> { Center(); Side(left); Side(right) }
+                "right" -> { Side(left); Side(right); Center() }
+                else -> { Side(left); Center(); Side(right) }
             }
         }
     } else {
@@ -197,15 +247,111 @@ private fun androidx.compose.foundation.layout.ColumnScope.Dashboard(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            CenterStage(cfg, st, Modifier.fillMaxWidth().height(460.dp), onAction)
-            MediaCard(Modifier.fillMaxWidth(), onAction)
-            PhoneCard(cfg, Modifier.fillMaxWidth(), onAction)
-            Row(Modifier.fillMaxWidth().height(300.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                EnergyCard(cfg, st, Modifier.weight(1f).fillMaxHeight()) { onAction("action:battery") }
-                TireCard(cfg, st, Modifier.weight(1f).fillMaxHeight()) { onAction("action:tires") }
+            CenterStage(cfg, st, Modifier.fillMaxWidth().height(460.dp), onAction, ctl)
+            (left + right).forEach { id ->
+                key(id) { Card(id, if (isBigCard(id)) Modifier.fillMaxWidth().height(300.dp) else Modifier.fillMaxWidth()) }
             }
-            SafetyCard(st, Modifier.fillMaxWidth())
         }
+    }
+}
+
+private val HOME_CARDS = listOf("energy", "safety", "tires", "media", "phone")
+private fun isBigCard(id: String) = id == "energy" || id == "tires"
+private fun cardName(id: String) = when (id) {
+    "energy" -> "แบตเตอรี่"
+    "safety" -> "ประตู/เข็มขัด"
+    "tires" -> "ลมยาง"
+    "media" -> "เพลง"
+    "phone" -> "โทรศัพท์"
+    else -> id
+}
+
+private fun shiftCenter(pos: String, dir: String): String {
+    val order = listOf("left", "center", "right")
+    val i = order.indexOf(pos).coerceAtLeast(0)
+    return order[(i + if (dir == "left") -1 else if (dir == "right") 1 else 0).coerceIn(0, 2)]
+}
+
+/** ย้ายการ์ด: up/down = ในคอลัมน์เดิม, left/right = ไปคอลัมน์ข้าง, hide = ซ่อน, show = แสดงกลับ (ท้ายคอลัมน์ขวา) */
+private fun moveHomeCard(s: AppSettings, id: String, dir: String): AppSettings {
+    val l = s.homeLeft.filter { it in HOME_CARDS }.toMutableList()
+    val r = s.homeRight.filter { it in HOME_CARDS && it !in l }.toMutableList()
+    val col = if (id in l) l else if (id in r) r else null
+    when (dir) {
+        "up", "down" -> col?.let { c ->
+            val i = c.indexOf(id)
+            val j = if (dir == "up") i - 1 else i + 1
+            if (j in c.indices) { c[i] = c[j]; c[j] = id }
+        }
+        "left" -> if (id in r) { r.remove(id); l.add(id) }
+        "right" -> if (id in l) { l.remove(id); r.add(id) }
+        "hide" -> { l.remove(id); r.remove(id) }
+        "show" -> if (col == null) r.add(id)
+    }
+    return s.copy(homeLeft = l, homeRight = r)
+}
+
+/** ห่อการ์ดด้วยปุ่มย้ายตำแหน่งเมื่ออยู่ในโหมดจัดวาง */
+@Composable
+private fun Arrangeable(
+    arrange: Boolean,
+    modifier: Modifier,
+    onMove: (String) -> Unit,
+    onHide: (() -> Unit)?,
+    vertical: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val ui = LocalUi.current
+    val shape = RoundedCornerShape(ui.corner)
+    Box(modifier) {
+        content()
+        if (arrange) {
+            Box(
+                Modifier.matchParentSize().clip(shape).background(Color.Black.copy(alpha = 0.5f))
+                    .border(2.dp, ui.accent, shape).clickable { },
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ArrowBtn(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "ย้ายซ้าย") { onMove("left") }
+                    if (vertical) {
+                        ArrowBtn(Icons.Rounded.KeyboardArrowUp, "ย้ายขึ้น") { onMove("up") }
+                        ArrowBtn(Icons.Rounded.KeyboardArrowDown, "ย้ายลง") { onMove("down") }
+                    }
+                    ArrowBtn(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "ย้ายขวา") { onMove("right") }
+                    if (onHide != null) ArrowBtn(Icons.Rounded.VisibilityOff, "ซ่อน", StatusColors.bad) { onHide() }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArrowBtn(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, bg: Color = LocalUi.current.accent, onClick: () -> Unit) {
+    Box(
+        Modifier.size(40.dp).clip(CircleShape).background(bg).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(26.dp)) }
+}
+
+/** แถบด้านบนระหว่างจัดวาง: แสดงการ์ดที่ซ่อน + รีเซ็ต + เสร็จ */
+@Composable
+private fun ArrangeBar(cfg: AppSettings, onDone: () -> Unit) {
+    val app = LocalContext.current.app
+    val hidden = HOME_CARDS.filter { it !in cfg.homeLeft && it !in cfg.homeRight }
+    Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("จัดวางหน้าหลัก", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("ใช้ลูกศรย้ายการ์ด · ปุ่มแดง = ซ่อน", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        hidden.forEach { id ->
+            TextButton({ app.settings.update { s -> moveHomeCard(s, id, "show") } }) { Text("+ " + cardName(id)) }
+        }
+        TextButton({
+            val d = AppSettings()
+            app.settings.update { s -> s.copy(homeLeft = d.homeLeft, homeRight = d.homeRight, centerPos = d.centerPos) }
+        }) { Text("รีเซ็ต") }
+        Spacer(Modifier.width(6.dp))
+        androidx.compose.material3.Button(onDone) { Text("เสร็จ") }
     }
 }
 
@@ -220,7 +366,7 @@ private fun rememberClock(): State<Date> = produceState(Date()) {
 }
 
 @Composable
-private fun TopBar(cfg: AppSettings, st: VehicleState, onAction: (String) -> Unit) {
+private fun TopBar(cfg: AppSettings, st: VehicleState, onAction: (String) -> Unit, onArrange: () -> Unit) {
     val now by rememberClock()
     val timeFmt = remember(cfg.use24h, cfg.showSeconds) {
         SimpleDateFormat((if (cfg.use24h) "HH:mm" else "h:mm") + (if (cfg.showSeconds) ":ss" else ""), Locale.US)
@@ -253,6 +399,7 @@ private fun TopBar(cfg: AppSettings, st: VehicleState, onAction: (String) -> Uni
                     else -> Pill("แผงควบคุม", icon = Icons.Rounded.Tune)
                 }
             }
+            RoundIconButton(Icons.Rounded.Dashboard, "จัดวางหน้าหลัก", onArrange, size = 46.dp)
             RoundIconButton(Icons.Rounded.Tune, "แผงควบคุม", { onAction("action:quick") }, size = 46.dp)
         }
     }
@@ -265,13 +412,16 @@ private fun TopBar(cfg: AppSettings, st: VehicleState, onAction: (String) -> Uni
  * กดปุ่ม รถ / แผนที่ / เพลง เพื่อสลับเองได้ (กด "รถ" = เริ่มนับใหม่)
  */
 @Composable
-private fun CenterStage(cfg: AppSettings, st: VehicleState, modifier: Modifier, onAction: (String) -> Unit) {
+private fun CenterStage(
+    cfg: AppSettings, st: VehicleState, modifier: Modifier, onAction: (String) -> Unit,
+    ctl: CenterCtl, full: Boolean = false,
+) {
     val app = LocalContext.current.app
     val now by app.media.now.collectAsStateWithLifecycle()
-    var mode by remember { mutableStateOf("car") }
-    var manual by remember { mutableStateOf(false) }
-    var restart by remember { mutableIntStateOf(0) }
-    var left by remember { mutableIntStateOf(cfg.carShowSec) }
+    var mode by ctl::mode
+    var manual by ctl::manual
+    var restart by ctl::restart
+    var left by ctl::left
     val target = when (cfg.centerAfter) {
         "map" -> "map"
         "media" -> "media"
@@ -281,7 +431,7 @@ private fun CenterStage(cfg: AppSettings, st: VehicleState, modifier: Modifier, 
     // นับถอยหลังแล้วสลับ
     LaunchedEffect(restart, cfg.carShowSec, cfg.centerAfter) {
         if (mode != "car" || cfg.centerAfter == "car") return@LaunchedEffect
-        left = cfg.carShowSec.coerceIn(1, 120)
+        if (left <= 0 || left > cfg.carShowSec) left = cfg.carShowSec.coerceIn(1, 120)
         while (left > 0) {
             delay(1000)
             left--
@@ -302,10 +452,16 @@ private fun CenterStage(cfg: AppSettings, st: VehicleState, modifier: Modifier, 
             ModeSwitch(mode) { m ->
                 manual = m != "car"
                 mode = m
-                if (m == "car") restart++
+                if (m == "car") { left = cfg.carShowSec.coerceIn(1, 120); restart++ }
             }
             Spacer(Modifier.width(10.dp))
             GearIndicator(st.gear)
+            Spacer(Modifier.width(10.dp))
+            RoundIconButton(
+                if (full) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
+                if (full) "ออกจากเต็มจอ" else "เต็มจอ",
+                { ctl.full = !full }, size = 42.dp,
+            )
         }
         Spacer(Modifier.height(6.dp))
         androidx.compose.animation.Crossfade(mode, Modifier.weight(1f).fillMaxWidth(), animationSpec = tween(600), label = "center") { m ->
@@ -325,8 +481,18 @@ private fun CenterStage(cfg: AppSettings, st: VehicleState, modifier: Modifier, 
                 }
             }
         }
-        SpeedGauge(cfg, st, Modifier.fillMaxWidth(0.6f).height(108.dp))
+        SpeedGauge(cfg, st, Modifier.fillMaxWidth(if (full) 0.36f else 0.6f).height(if (full) 92.dp else 108.dp))
     }
+}
+
+/** สถานะจอกลาง เก็บไว้ที่ HomeScreen เพื่อไม่ให้รีเซ็ตเมื่อสลับเต็มจอ */
+class CenterCtl(showSec: Int) {
+    var mode by mutableStateOf("car")
+    var manual by mutableStateOf(false)
+    var restart by mutableIntStateOf(0)
+    var left by mutableIntStateOf(showSec)
+    var full by mutableStateOf(false)
+    var arrange by mutableStateOf(false)
 }
 
 @Composable
@@ -632,6 +798,13 @@ private fun EnergyCard(cfg: AppSettings, st: VehicleState, modifier: Modifier, o
         Spacer(Modifier.height(10.dp))
         Label("RANGE")
         Text(distText(st.rangeKm, cfg.speedUnit), fontSize = 24.sp, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(10.dp))
+        val weather by LocalContext.current.app.weather.weather.collectAsStateWithLifecycle()
+        val outside = st.outsideTempC ?: weather?.tempC?.toFloat()
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MiniStat(Icons.Rounded.Thermostat, "ภายนอก", tempText(outside, cfg.tempUnit), Modifier.weight(1f))
+            MiniStat(Icons.Rounded.DeviceThermostat, "แบตเตอรี่", tempText(st.hvTempC, cfg.tempUnit), Modifier.weight(1f))
+        }
         Spacer(Modifier.weight(1f))
         Row {
             Column(Modifier.weight(1f)) {
@@ -892,6 +1065,23 @@ private fun PhoneCard(cfg: AppSettings, modifier: Modifier, onAction: (String) -
                     )
                 }
             }
+        }
+    }
+}
+
+
+@Composable
+private fun MiniStat(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, modifier: Modifier) {
+    Row(
+        modifier.clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = LocalUi.current.accent, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(6.dp))
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }

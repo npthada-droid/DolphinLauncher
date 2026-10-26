@@ -288,7 +288,9 @@ private fun AppearanceSection(cfg: AppSettings) {
         SwitchRow("พื้นกริดแบบโชว์รูม", cfg.showGrid) { v -> up { it.copy(showGrid = v) } }
     }
     SettingGroup("การ์ด & เลย์เอาต์") {
-        SliderRow("ความทึบของการ์ด", cfg.cardOpacity, 0.15f..1f, 0, ::pct) { v -> up { it.copy(cardOpacity = v) } }
+        SliderRow("ความทึบของการ์ด (น้อย = โปร่งใส)", cfg.cardOpacity, 0.05f..1f, 0, ::pct) { v -> up { it.copy(cardOpacity = v) } }
+        SwitchRow("เงาตัวหนังสือ", cfg.textGlow, "อ่านชัดขึ้นเมื่อการ์ดโปร่งใสหรือวางบนรูปพื้นหลัง") { v -> up { it.copy(textGlow = v) } }
+        SwitchRow("แสงสะท้อนแบบกระจก", cfg.glassShine) { v -> up { it.copy(glassShine = v) } }
         SliderRow("ความโค้งมุม", cfg.cornerRadius.toFloat(), 0f..40f, 0, { "${it.roundToInt()} dp" }) { v ->
             up { it.copy(cornerRadius = v.roundToInt()) }
         }
@@ -523,7 +525,16 @@ private fun ShortcutSection(cfg: AppSettings) {
     SettingGroup("Dock ด้านล่าง (สูงสุด 8)") {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             cfg.dock.forEach { key ->
-                ShortcutTile(key, apps, true, onClick = {}, onRemove = { up { s -> s.copy(dock = s.dock - key) } })
+                ShortcutTile(
+                    key, apps, true, onClick = {}, onRemove = { up { s -> s.copy(dock = s.dock - key) } },
+                    onMove = { d ->
+                        up { s ->
+                            val l = s.dock.toMutableList(); val i = l.indexOf(key); val j = i + d
+                            if (i >= 0 && j in l.indices) { l[i] = l[j]; l[j] = key }
+                            s.copy(dock = l)
+                        }
+                    },
+                )
             }
             if (cfg.dock.size < 8) AddTile { picking = true }
         }
@@ -634,11 +645,58 @@ private fun SystemSection() {
     val cm = remember { ctx.getSystemService(ClipboardManager::class.java) }
     var confirmReset by remember { mutableStateOf(false) }
     SettingGroup("ตั้งเป็นหน้าหลัก (Launcher) ของรถ") {
-        Hint("เลือก Dolphin Launcher เป็นแอปหน้าแรก แล้วกดปุ่ม Home จะกลับมาที่หน้านี้เสมอ")
-        Button({
+        var unlocked by remember { mutableStateOf(th.dolphin.launcher.HomeLock.isUnlocked(ctx)) }
+        var askPass by remember { mutableStateOf(false) }
+        val openHomeSettings = {
             runCatching { ctx.startActivity(Intent(Settings.ACTION_HOME_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                 .onFailure { ctx.toast("ระบบรถไม่มีหน้าเลือก Launcher — กดปุ่ม Home แล้วเลือกแอปนี้แทน") }
-        }) { Text("เปิดหน้าตั้งค่าแอปหน้าแรก") }
+            Unit
+        }
+        if (unlocked) {
+            Hint("ปลดล็อกแล้ว · เลือก Dolphin Launcher เป็นแอปหน้าแรก แล้วกดปุ่ม Home จะกลับมาที่หน้านี้เสมอ")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(openHomeSettings) { Text("เปิดหน้าตั้งค่าแอปหน้าแรก") }
+                OutlinedButton({
+                    th.dolphin.launcher.HomeLock.lock(ctx)
+                    unlocked = false
+                    ctx.toast("ล็อกแล้ว · ปุ่ม Home จะกลับไปหน้าจอเดิมของรถ")
+                }) { Text("ล็อกกลับ") }
+            }
+        } else {
+            Hint("🔒 ล็อกอยู่ · ตอนนี้ใช้เป็นแอปธรรมดาได้ แต่ยังตั้งเป็นหน้าหลักของรถไม่ได้ ต้องใส่รหัสผ่านก่อน")
+            Button({ askPass = true }) { Text("ปลดล็อกด้วยรหัสผ่าน") }
+        }
+        if (askPass) {
+            var pass by remember { mutableStateOf("") }
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { askPass = false },
+                title = { Text("ใส่รหัสผ่าน") },
+                text = {
+                    OutlinedTextField(
+                        pass, { pass = it.take(12) }, singleLine = true,
+                        label = { Text("รหัสผ่าน") },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                        ),
+                    )
+                },
+                confirmButton = {
+                    Button({
+                        if (th.dolphin.launcher.HomeLock.tryUnlock(ctx, pass)) {
+                            unlocked = true
+                            askPass = false
+                            ctx.toast("ปลดล็อกแล้ว")
+                            openHomeSettings()
+                        } else {
+                            pass = ""
+                            ctx.toast("รหัสผ่านไม่ถูกต้อง")
+                        }
+                    }) { Text("ตกลง") }
+                },
+                dismissButton = { androidx.compose.material3.TextButton({ askPass = false }) { Text("ยกเลิก") } },
+            )
+        }
     }
     SettingGroup("สำรอง / กู้คืนการตั้งค่า") {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -670,7 +728,7 @@ private fun SystemSection() {
         }
         SwitchRow("โหมดเข้มงวด", cfg.guardStrict, "ลดจำนวนครั้งที่ยอมให้ทำซ้ำลง ~1/3 — เหมาะช่วงทดลองใช้ในรถ") { v -> up { it.copy(guardStrict = v) } }
         val hist = remember { th.dolphin.launcher.SafetyGuard.history(ctx) }
-        val df = remember { java.text.SimpleDateFormat("d MMM HH:mm", java.util.th.dolphin.launcher.i18n.I18n.dateLocale()) }
+        val df = remember { java.text.SimpleDateFormat("d MMM HH:mm", th.dolphin.launcher.i18n.I18n.dateLocale()) }
         Text("ประวัติการหยุดทำงาน (${hist.size})", style = MaterialTheme.typography.titleSmall)
         if (hist.isEmpty()) Hint("ยังไม่เคยเกิดปัญหา")
         hist.take(5).forEach { t -> Hint("• ${df.format(java.util.Date(t.time))}  ${t.reason}") }
@@ -885,7 +943,7 @@ private fun TripServiceSection(cfg: AppSettings) {
     val app = ctx.app
     val st by app.vehicle.state.collectAsStateWithLifecycle()
     val service = th.dolphin.launcher.alerts.Maintenance.status(st, cfg)
-    val df = remember { java.text.SimpleDateFormat("d MMM yyyy", java.util.th.dolphin.launcher.i18n.I18n.dateLocale()) }
+    val df = remember { java.text.SimpleDateFormat("d MMM yyyy", th.dolphin.launcher.i18n.I18n.dateLocale()) }
 
     SettingGroup("แบตเตอรี่และค่าไฟ") {
         ChoiceRow(

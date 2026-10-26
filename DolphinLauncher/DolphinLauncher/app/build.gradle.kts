@@ -11,14 +11,16 @@ android {
     defaultConfig {
         applicationId = "th.dolphin.launcher"
         minSdk = 26
+        // targetSdk 29 = Android 10 (DiLink) : ลดข้อจำกัด background/overlay/hidden-API บนหัวเครื่องรถ
         targetSdk = 29
-        versionCode = 7
-        versionName = "1.6.0"
+        versionCode = 8
+        versionName = "1.7.0"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            // เซ็นด้วย debug key เพื่อให้ติดตั้งได้ทันที (เปลี่ยนเป็น keystore ของคุณเองได้)
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -56,6 +58,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
+    // แผนที่ OpenStreetMap (ไม่ต้องใช้ API key)
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
     val camerax = "1.4.1"

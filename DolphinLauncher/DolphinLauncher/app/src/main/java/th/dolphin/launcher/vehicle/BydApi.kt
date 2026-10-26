@@ -120,11 +120,20 @@ class BydReflect(private val ctx: Context) {
     fun device(cls: String): Any? {
         devices[cls]?.let { return it }
         if (cls in failed) return null
-        val inst: Any? = runCatching {
-            val c = Class.forName(cls)
-            runCatching { c.getMethod("getInstance", Context::class.java).invoke(null, ctx) }.getOrNull()
-                ?: runCatching { c.getMethod("getInstance").invoke(null) }.getOrNull()
-        }.getOrNull()
+        val create: () -> Any? = {
+            runCatching {
+                val c = Class.forName(cls)
+                runCatching { c.getMethod("getInstance", Context::class.java).invoke(null, ctx) }.getOrNull()
+                    ?: runCatching { c.getMethod("getInstance").invoke(null) }.getOrNull()
+            }.getOrNull()
+        }
+        // คลาสของ BYD บางตัวสร้าง Handler ภายใน จึงต้องสร้างบน main thread (รอไม่เกิน 2 วินาที กันจอค้าง)
+        val inst: Any? = if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) create() else {
+            var r: Any? = null
+            val latch = java.util.concurrent.CountDownLatch(1)
+            android.os.Handler(android.os.Looper.getMainLooper()).post { r = create(); latch.countDown() }
+            if (latch.await(2, java.util.concurrent.TimeUnit.SECONDS)) r else create()
+        }
         if (inst == null) failed += cls else devices[cls] = inst
         return inst
     }

@@ -27,6 +27,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.BatteryChargingFull
@@ -45,10 +47,9 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.ThreeSixty
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TireRepair
-import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -85,7 +86,7 @@ data class BuiltinAction(val key: String, val label: String, val icon: ImageVect
 object BuiltinActions {
     val all = listOf(
         BuiltinAction("action:camera", "กล้องรอบคัน", Icons.Rounded.Videocam),
-        BuiltinAction("action:panorama", "360° ของรถ", Icons.Rounded.ThreeSixty),
+        BuiltinAction("action:panorama", "360° ของรถ", Icons.Rounded.Videocam),
         BuiltinAction("action:projection", "Android Auto / มิเรอร์", Icons.Rounded.Cast),
         BuiltinAction("action:audio", "เสียงและเพลง", Icons.Rounded.MusicNote),
         BuiltinAction("action:radio", "วิทยุ", Icons.Rounded.Radio),
@@ -146,6 +147,7 @@ fun ShortcutTile(
     onLongClick: () -> Unit = {},
     onRemove: () -> Unit = {},
     iconSize: Dp = 58.dp,
+    onMove: ((Int) -> Unit)? = null,
 ) {
     val s = resolveShortcut(key, apps)
     Column(
@@ -169,6 +171,17 @@ fun ShortcutTile(
                         .clickable(onClick = onRemove),
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Rounded.Close, "ลบ", tint = Color.White, modifier = Modifier.size(16.dp)) }
+            }
+        }
+        if (editing && onMove != null) {
+            Spacer(Modifier.height(4.dp))
+            androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+                listOf(-1 to Icons.AutoMirrored.Rounded.KeyboardArrowLeft, 1 to Icons.AutoMirrored.Rounded.KeyboardArrowRight).forEach { (d, ic) ->
+                    Box(
+                        Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary).clickable { onMove(d) },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(ic, if (d < 0) "ย้ายซ้าย" else "ย้ายขวา", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp)) }
+                }
             }
         }
         Spacer(Modifier.height(6.dp))

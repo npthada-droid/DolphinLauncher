@@ -117,6 +117,12 @@ fun Text(
         softWrap = softWrap,
         maxLines = maxLines,
         minLines = minLines,
-        style = style,
+        style = run {
+            // การ์ดโปร่งใส: เพิ่มเงาจางๆ ให้ตัวหนังสืออ่านง่ายบนพื้นหลัง/แผนที่ (เฉพาะธีมมืด)
+            val ui = th.dolphin.launcher.ui.theme.LocalUi.current
+            if (ui.textGlow && ui.dark && style.shadow == null)
+                style.copy(shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.75f), blurRadius = 6f))
+            else style
+        },
     )
 }

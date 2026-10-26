@@ -76,6 +76,7 @@ fun ShortcutPagerCard(modifier: Modifier, onAction: (String) -> Unit) {
                         onLongClick = { edit = true },
                         onRemove = { app.shortcuts.remove(pageIdx, key) },
                         iconSize = 46.dp,
+                        onMove = { d -> app.shortcuts.move(pageIdx, key, d) },
                     )
                 }
                 if (edit || items.isEmpty()) AddTile(46.dp) { pickFor = pageIdx }

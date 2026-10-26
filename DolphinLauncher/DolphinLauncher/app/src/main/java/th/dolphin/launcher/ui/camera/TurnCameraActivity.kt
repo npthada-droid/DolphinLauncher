@@ -30,7 +30,8 @@ class TurnCameraActivity : ComponentActivity() {
 
         fun show(ctx: Context, turn: TurnSignal) {
             if (showing) return
-            if (!th.dolphin.launcher.SafetyGuard.allow("turncam", 10, 60_000, "การเปิดกล้องไฟเลี้ยว")) return
+            // ไฟเลี้ยวเป็นเรื่องปกติของการขับ: เกินโควตาแค่ไม่เปิดกล้อง ไม่หยุด Launcher
+            if (!th.dolphin.launcher.SafetyGuard.allowSoft("turncam", 12, 60_000)) return
             val i = Intent(ctx, TurnCameraActivity::class.java)
                 .putExtra("turn", turn.name)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)

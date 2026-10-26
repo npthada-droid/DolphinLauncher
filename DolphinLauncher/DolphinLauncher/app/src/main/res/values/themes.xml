@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dolphin Launcher</string>
+    <color name="bg">#06080C</color>
+    <color name="ic_launcher_background">#0B1620</color>
+
+    <style name="Theme.Dolphin" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowShowWallpaper">false</item>
+    </style>
+
+    <!-- หน้าต่างลอยสำหรับกล้องไฟเลี้ยว (ไม่บังการสัมผัสส่วนอื่นของจอ) -->
+    <style name="Theme.Dolphin.Floating" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowCloseOnTouchOutside">false</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Toast</item>
+    </style>
+</resources>
